@@ -17,6 +17,7 @@ from analysis import variance
 import tools
 
 
+
 def get_default_hp(ruleset):
     '''Get a default hp.
 
