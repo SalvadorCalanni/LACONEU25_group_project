@@ -10,7 +10,7 @@ rules_dict = \
     {'all' : ['fdgo', 'reactgo', 'delaygo', 'fdanti', 'reactanti', 'delayanti',
               'dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm',
               'delaydm1', 'delaydm2', 'contextdelaydm1', 'contextdelaydm2', 'multidelaydm',
-              'dmsgo', 'dmsnogo', 'dmcgo', 'dmcnogo'],
+              'dmsgo', 'dmsnogo', 'dmcgo', 'dmcnogo', 'random'],
 
     'mante' : ['contextdm1', 'contextdm2'],
 
@@ -137,6 +137,14 @@ class Trial(object):
         pre_on   = int(100/self.dt) # never check the first 100ms
         pre_offs = self.expand(pre_offs)
         post_ons = self.expand(post_ons)
+        
+        if pre_offs == None and post_ons == None:
+            if self.config['loss_type'] == 'lsq':
+                c_mask = np.zeros((self.tdim, self.batch_size, self.n_output), dtype=self.float_type)
+                self.c_mask = c_mask.reshape((self.tdim*self.batch_size, self.n_output))
+            else:
+                c_mask = np.zeros((self.tdim, self.batch_size), dtype=self.float_type)
+                self.c_mask = c_mask.reshape((self.tdim*self.batch_size,))
 
         if self.config['loss_type'] == 'lsq':
             c_mask = np.zeros((self.tdim, self.batch_size, self.n_output), dtype=self.float_type)
@@ -209,6 +217,20 @@ def test_init(config, mode, **kwargs):
 
     return trial
 
+def random(config, mode=None, **kwargs):
+    '''
+    Random task. Fixation is on then off.
+    '''
+    dt = config['dt']
+    tdim = int(10000/dt)
+    batch_size = kwargs['batch_size']
+
+    trial = Trial(config, tdim, batch_size)
+    trial.add_x_noise()
+    trial.add_c_mask(None, None)
+
+    return trial
+
 
 def delaygo_(config, mode, anti_response, **kwargs):
     '''
@@ -239,12 +261,19 @@ def delaygo_(config, mode, anti_response, **kwargs):
         stim_locs = rng.rand(batch_size)*2*np.pi
         # stim_ons  = int(500/dt)
         stim_ons  = int(rng.choice([300, 500, 700])/dt)
-        # stim_offs = stim_ons + int(200/dt)
         stim_offs = stim_ons + int(rng.choice([200, 400, 600])/dt)
-        fix_offs = stim_offs + int(rng.choice([200, 400, 800, 1600])/dt)
-        # fix_offs = stim_offs + int(rng.choice([1600])/dt)
+        # fix_offs = stim_offs #+ int(rng.choice([200])/dt)
+        fix_offs = stim_ons + int(rng.choice([200, 400, 800, 1600])/dt)
         tdim     = fix_offs + int(500/dt)
         stim_mod  = rng.choice([1,2])
+
+        # # A list of locations of stimulus (they are always on)
+        # stim_locs = rng.rand(batch_size)*2*np.pi
+        # stim_mod  = rng.choice([1,2])
+        # stim_ons  = int(rng.uniform(300,700)/dt)
+        # fix_offs  = stim_ons + int(rng.uniform(500,1500)/dt)
+        # stim_offs = fix_offs
+        # tdim      = int(500/dt) + fix_offs
 
     elif mode == 'test':
         tdim = int(2500/dt)
@@ -439,10 +468,10 @@ def _contextdm(config, mode, attend_mod, **kwargs):
 
     trial = Trial(config, tdim, batch_size)
     trial.add('fix_in', offs=fix_offs)
-    trial.add('stim', stim1_locs, ons=stim_ons, offs=stim_offs, strengths=stim1_mod1_strengths, mods=1)
-    trial.add('stim', stim2_locs, ons=stim_ons, offs=stim_offs, strengths=stim2_mod1_strengths, mods=1)
-    trial.add('stim', stim1_locs, ons=stim_ons, offs=stim_offs, strengths=stim1_mod2_strengths, mods=2)
-    trial.add('stim', stim2_locs, ons=stim_ons, offs=stim_offs, strengths=stim2_mod2_strengths, mods=2)
+    trial.add('stim', stim1_locs, ons=stim_ons, offs=None, strengths=stim1_mod1_strengths, mods=1)
+    trial.add('stim', stim2_locs, ons=stim_ons, offs=None, strengths=stim2_mod1_strengths, mods=1)
+    trial.add('stim', stim1_locs, ons=stim_ons, offs=None, strengths=stim1_mod2_strengths, mods=2)
+    trial.add('stim', stim2_locs, ons=stim_ons, offs=None, strengths=stim2_mod2_strengths, mods=2)
     trial.add('fix_out', offs=fix_offs)
     stim_locs = [stim1_locs[i] if (stim1_strengths[i]>stim2_strengths[i])
                 else stim2_locs[i] for i in range(batch_size)]
@@ -1531,7 +1560,8 @@ rule_mapping = {'testinit': test_init,
                 'dmcgo': dmcgo,
                 'dmcnogo': dmcnogo,
                 'oic': oic,
-                'dmc': delaymatchcategory_original}
+                'dmc': delaymatchcategory_original,
+                'random':random}
 
 rule_name    = {'reactgo': 'RT Go',
                 'delaygo': 'Dly Go',
@@ -1554,8 +1584,8 @@ rule_name    = {'reactgo': 'RT Go',
                 'dmcgo': 'DMC',
                 'dmcnogo': 'DNMC',
                 'oic': '1IC',
-                'dmc': 'DMC'
-                }
+                'dmc': 'DMC',
+                'random': 'rand'}
 
 
 def generate_trials(rule, hp, mode, noise_on=True, **kwargs):
@@ -1587,9 +1617,10 @@ def generate_trials(rule, hp, mode, noise_on=True, **kwargs):
     if 'replace_rule' in kwargs:
         rule = kwargs['replace_rule']
 
-    if rule is 'testinit':
+    if rule is 'testinit' or rule is 'random':
         # Add no rule
         return trial
+    
 
     if isinstance(rule, six.string_types):
         # rule is not iterable
@@ -1606,10 +1637,13 @@ def generate_trials(rule, hp, mode, noise_on=True, **kwargs):
         else:
             rule_strength = [1.] * len(rule)
 
-    for r, s in zip(rule, rule_strength):
-        trial.add_rule(r, on=rule_on, off=rule_off, strength=s)
+    #turn off adding rule here
+    if not ('no_rule' in kwargs and kwargs['no_rule']):
+        for r, s in zip(rule, rule_strength):
+            trial.add_rule(r, on=rule_on, off=rule_off, strength=s)
 
     if noise_on:
         trial.add_x_noise()
 
     return trial
+
