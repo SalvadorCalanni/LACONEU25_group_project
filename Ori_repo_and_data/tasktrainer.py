@@ -6,7 +6,18 @@ import matplotlib.pyplot as plt
 import tools
 import numpy as np
 from task import generate_trials, rule_name, get_dist
+
 import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable GPU
+os.environ['TF_NUM_INTEROP_THREADS'] = '1'
+os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
+
+import tensorflow as tf
+
+# Configure TF to use single thread
+tf.config.threading.set_inter_op_parallelism_threads(1)
+tf.config.threading.set_intra_op_parallelism_threads(1)
+
 
 def trainpair(task1,task2,hnodes=32,netfolder="networks/"):
     netname = "_".join(["laconeu",task1,task2,str(hnodes)])
@@ -37,4 +48,8 @@ for i in range(len(tasks)):
         if "SLURM_ARRAY_TASK_ID" in os.environ and counter != int(os.environ["SLURM_ARRAY_TASK_ID"]):
             counter+=1
             continue
+        print("SLURM_ARRAY_TASK_ID" in os.environ)
+        print(counter)
+        print(tasks[i],tasks[j])
+        counter+=1
         trainpair(tasks[i],tasks[j],hnodes=24,netfolder="networks/")
