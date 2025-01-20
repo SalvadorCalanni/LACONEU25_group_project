@@ -37,9 +37,9 @@ def trainpair(task1,task2,hnodes=32,netfolder="networks/"):
 
 
 tasks = ['fdgo', 'reactgo', 'delaygo', 'fdanti', 'reactanti', 'delayanti',
-              'dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm',
-              'delaydm1', 'delaydm2', 'contextdelaydm1', 'contextdelaydm2', 'multidelaydm',
-              'dmsgo', 'dmsnogo', 'dmcgo', 'dmcnogo']
+            'delaydm1', 'delaydm2', 'contextdelaydm1', 'contextdelaydm2', 'multidelaydm',
+            'dmsgo', 'dmsnogo', 'dmcgo', 'dmcnogo']
+excluded = ['dm1', 'dm2', 'contextdm1', 'contextdm2','multidm']
 
 # pair task iteration
 counter = 0 
@@ -52,4 +52,4 @@ for i in range(len(tasks)):
         print(counter)
         print(tasks[i],tasks[j])
         counter+=1
-        trainpair(tasks[i],tasks[j],hnodes=24,netfolder="networks/")
+        trainpair(tasks[i],tasks[j],hnodes=24,netfolder="../networks_24/")
