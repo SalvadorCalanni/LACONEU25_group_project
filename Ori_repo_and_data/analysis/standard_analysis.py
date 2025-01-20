@@ -5,6 +5,8 @@ from __future__ import division
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
+import networkx as nx
+import matplotlib as mpl
 
 from task import generate_trials, rule_name
 from network import Model
@@ -25,10 +27,14 @@ def easy_activity_plot(model_dir, rule):
     with tf.Session() as sess:
         model.restore()
 
-        trial = generate_trials(rule, hp, mode='test')
+        if rule == 'random': #Idk why, but if rule='random', it needs batch_size=32. Salva.
+            trial = generate_trials(rule, hp, mode='test', batch_size=32)    
+        else:
+            trial = generate_trials(rule, hp, mode='test')
+        
         feed_dict = tools.gen_feed_dict(model, trial, hp)
         h, y_hat = sess.run([model.h, model.y_hat], feed_dict=feed_dict)
-        # All matrices have shape (n_time, n_condition, n_neuron)
+            # All matrices have shape (n_time, n_condition, n_neuron)
 
     # Take only the one example trial
     i_trial = 0
@@ -84,7 +90,7 @@ def pretty_inputoutput_plot(model_dir, rule, save=False, plot_ylabel=False):
     """
 
 
-    fs = 7
+    fs = 20
 
     model = Model(model_dir)
     hp = model.hp
@@ -382,7 +388,7 @@ def schematic_plot(model_dir, rule=None):
                        rotation='vertical')
             plt.title('Stimulus mod 2', fontsize=fontsize, y=0.9)
         ax.get_yaxis().set_label_coords(-0.12,0.5)
-    plt.savefig('figure/schematic_input.pdf',transparent=True)
+    #plt.savefig('figure/schematic_input.pdf',transparent=True)
     plt.show()
 
     # Plot Rule Inputs
@@ -410,7 +416,7 @@ def schematic_plot(model_dir, rule=None):
     plt.title('Rule inputs', fontsize=fontsize, y=0.9)
     ax.get_yaxis().set_label_coords(-0.12,0.5)
 
-    plt.savefig('figure/schematic_rule.pdf',transparent=True)
+    #plt.savefig('figure/schematic_rule.pdf',transparent=True)
     plt.show()
 
 
@@ -434,7 +440,7 @@ def schematic_plot(model_dir, rule=None):
     plt.yticks([0,n_hidden-1],['1',str(n_hidden)],rotation='vertical')
     plt.title('Recurrent units', fontsize=fontsize, y=0.95)
     ax.get_yaxis().set_label_coords(-0.12,0.5)
-    plt.savefig('figure/schematic_units.pdf',transparent=True)
+    #plt.savefig('figure/schematic_units.pdf',transparent=True)
     plt.show()
 
 
@@ -473,12 +479,12 @@ def schematic_plot(model_dir, rule=None):
 
         ax.get_yaxis().set_label_coords(-0.12,0.5)
 
-    plt.savefig('figure/schematic_outputs.pdf',transparent=True)
+    #plt.savefig('figure/schematic_outputs.pdf',transparent=True)
     plt.show()
     
 
 def networkx_illustration(model_dir):
-    import networkx as nx
+    
 
     model = Model(model_dir)
     with tf.Session() as sess:
@@ -488,7 +494,7 @@ def networkx_illustration(model_dir):
         
     w_rec_flat = w_rec.flatten()
     ind_sort = np.argsort(abs(w_rec_flat - np.mean(w_rec_flat)))
-    n_show = int(0.01*len(w_rec_flat))
+    n_show = int(len(w_rec_flat)) 
     ind_gone = ind_sort[:-n_show]
     ind_keep = ind_sort[-n_show:]
     w_rec_flat[ind_gone] = 0
@@ -512,8 +518,102 @@ def networkx_illustration(model_dir):
             edge_color=color,
             edge_cmap=plt.cm.RdBu_r,
             ax=ax)
-    plt.savefig('figure/illustration_networkx.pdf', transparent=True)
+    #plt.savefig('figure/illustration_networkx.pdf', transparent=True)
+    plt.show()
+    
+    
+    
+    
+def networkx_illustration_salva(model_dir, threshold=0.1):
+    """
+    Loads a trained model, extracts the recurrent weight matrix (w_rec),
+    thresholds it, and draws a circular NetworkX graph of non-zero edges.
+    
+    :param model_dir: Path to the trained model directory.
+    :param threshold: Threshold (absolute value) below which edges are set to zero.
+    """
 
+    mpl.rcParams.update({
+        'font.size': 20,       # Overall text
+        'axes.titlesize': 18,  # Axes title size
+        'axes.labelsize': 18,  # Axes label size
+        'xtick.labelsize': 16,
+        'ytick.labelsize': 16
+    })
+    model = Model(model_dir)
+    with tf.Session() as sess:
+        model.restore()
+        # get all connection weights and biases as tensorflow variables
+        w_rec = sess.run(model.w_rec)
+# Threshold
+    w_mask = (np.abs(w_rec) >= threshold).astype(float)
+    w_thresholded = w_rec * w_mask
+
+    # Build graph from absolute adjacency matrix
+    G = nx.from_numpy_array(np.abs(w_thresholded), create_using=nx.DiGraph())
+    
+    # Edge colors (signed)
+    edges = list(G.edges())
+    edge_colors = [w_thresholded[i, j] for (i, j) in edges]
+    
+    # Prepare the figure and two “spaces” on it:
+    #   - `ax_graph` for the network
+    #   - `ax_cbar` for the colorbar
+    # 
+    # We give them separate subplot parameters so the network axis
+    # stays square (aspect ratio = 1) and the colorbar can sit off to the side.
+    fig = plt.figure(figsize=(7, 6))
+    # GridSpec: 1 row, 2 columns, widths for columns can be adjusted
+    gs = fig.add_gridspec(1, 2, width_ratios=[0.9, 0.05])
+
+    # The main axis for drawing the graph
+    ax_graph = fig.add_subplot(gs[0, 0])
+    # A small axis for colorbar on the right
+    ax_cbar = fig.add_subplot(gs[0, 1])
+
+    # Circular layout
+    pos = nx.circular_layout(G)
+
+    # Draw nodes
+    nx.draw_networkx_nodes(
+        G,
+        pos=pos,
+        ax=ax_graph,
+        node_size=100,
+        node_color=[0.6, 0.6, 0.6],  # gray-ish
+    )
+
+    # Prepare colormap for edges
+    max_w = np.max(np.abs(w_thresholded))
+    edge_norm = mpl.colors.Normalize(vmin=-max_w, vmax=max_w)
+    edge_cmap = plt.cm.RdBu_r
+
+    # Draw edges
+    nx.draw_networkx_edges(
+        G,
+        pos=pos,
+        ax=ax_graph,
+        width=1.0,
+        edge_color=edge_colors,
+        edge_cmap=edge_cmap,
+        edge_vmin=edge_norm.vmin,
+        edge_vmax=edge_norm.vmax,
+        arrows=False
+    )
+
+    # Make axes square so it doesn't get "bent"
+    ax_graph.set_aspect('equal')
+    ax_graph.axis('off')
+    ax_graph.set_title(f"Network Visualization (threshold={threshold})")
+
+    # Create colorbar on ax_cbar
+    sm = mpl.cm.ScalarMappable(norm=edge_norm, cmap=edge_cmap)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, cax=ax_cbar)
+    cbar.set_label("Edge Weight")
+
+    plt.tight_layout()
+    plt.show()
 
 if __name__ == "__main__":
     root_dir = './data/train_all'
