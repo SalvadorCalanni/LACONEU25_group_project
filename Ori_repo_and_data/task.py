@@ -134,45 +134,46 @@ class Trial(object):
         as the pre period
         """
 
-        pre_on   = int(100/self.dt) # never check the first 100ms
-        pre_offs = self.expand(pre_offs)
-        post_ons = self.expand(post_ons)
         
-        if pre_offs == None and post_ons == None:
+        if (pre_offs is None) and (post_ons is None):
             if self.config['loss_type'] == 'lsq':
                 c_mask = np.zeros((self.tdim, self.batch_size, self.n_output), dtype=self.float_type)
                 self.c_mask = c_mask.reshape((self.tdim*self.batch_size, self.n_output))
             else:
                 c_mask = np.zeros((self.tdim, self.batch_size), dtype=self.float_type)
                 self.c_mask = c_mask.reshape((self.tdim*self.batch_size,))
-
-        if self.config['loss_type'] == 'lsq':
-            c_mask = np.zeros((self.tdim, self.batch_size, self.n_output), dtype=self.float_type)
-            for i in range(self.batch_size):
-                # Post response periods usually have the same length across tasks
-                c_mask[post_ons[i]:, i, :] = 5.
-                # Pre-response periods usually have different lengths across tasks
-                # To keep cost comparable across tasks
-                # Scale the cost mask of the pre-response period by a factor
-                c_mask[pre_on:pre_offs[i], i, :] = 1.
-
-            # self.c_mask[:, :, 0] *= self.n_eachring # Fixation is important
-            c_mask[:, :, 0] *= 2. # Fixation is important
-
-            self.c_mask = c_mask.reshape((self.tdim*self.batch_size, self.n_output))
         else:
-            c_mask = np.zeros((self.tdim, self.batch_size), dtype=self.float_type)
-            for i in range(self.batch_size):
-                # Post response periods usually have the same length across tasks
-                # Having it larger than 1 encourages the network to achieve higher performance
-                c_mask[post_ons[i]:, i] = 5.
-                # Pre-response periods usually have different lengths across tasks
-                # To keep cost comparable across tasks
-                # Scale the cost mask of the pre-response period by a factor
-                c_mask[pre_on:pre_offs[i], i] = 1.
+            pre_on   = int(100/self.dt) # never check the first 100ms
+            pre_offs = self.expand(pre_offs)
+            post_ons = self.expand(post_ons)
+        
+            if self.config['loss_type'] == 'lsq':
+                c_mask = np.zeros((self.tdim, self.batch_size, self.n_output), dtype=self.float_type)
+                for i in range(self.batch_size):
+                    # Post response periods usually have the same length across tasks
+                    c_mask[post_ons[i]:, i, :] = 5.
+                    # Pre-response periods usually have different lengths across tasks
+                    # To keep cost comparable across tasks
+                    # Scale the cost mask of the pre-response period by a factor
+                    c_mask[pre_on:pre_offs[i], i, :] = 1.
 
-            self.c_mask = c_mask.reshape((self.tdim*self.batch_size,))
-            self.c_mask /= self.c_mask.mean()
+                # self.c_mask[:, :, 0] *= self.n_eachring # Fixation is important
+                c_mask[:, :, 0] *= 2. # Fixation is important
+
+                self.c_mask = c_mask.reshape((self.tdim*self.batch_size, self.n_output))
+            else:
+                c_mask = np.zeros((self.tdim, self.batch_size), dtype=self.float_type)
+                for i in range(self.batch_size):
+                    # Post response periods usually have the same length across tasks
+                    # Having it larger than 1 encourages the network to achieve higher performance
+                    c_mask[post_ons[i]:, i] = 5.
+                    # Pre-response periods usually have different lengths across tasks
+                    # To keep cost comparable across tasks
+                    # Scale the cost mask of the pre-response period by a factor
+                    c_mask[pre_on:pre_offs[i], i] = 1.
+
+                self.c_mask = c_mask.reshape((self.tdim*self.batch_size,))
+                self.c_mask /= self.c_mask.mean()
 
     def add_rule(self, rule, on=None, off=None, strength=1.):
         """Add rule input."""
