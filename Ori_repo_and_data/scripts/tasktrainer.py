@@ -1,4 +1,8 @@
 #alltask trainer
+
+import sys
+
+sys.path.append('..')
 import train
 from analysis import performance
 
@@ -14,12 +18,13 @@ os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
 
 import tensorflow as tf
 
+
 # Configure TF to use single thread
 tf.config.threading.set_inter_op_parallelism_threads(1)
 tf.config.threading.set_intra_op_parallelism_threads(1)
 
 
-def trainpair(task1,task2,hnodes=32,netfolder="networks/"):
+def trainpair(task1,task2,hnodes=24,netfolder="networks/"):
     netname = "_".join(["laconeu",task1,task2,str(hnodes)])
     train.train(model_dir=netfolder+netname, 
             hp={'learning_rate': 0.001, 
@@ -38,8 +43,8 @@ def trainpair(task1,task2,hnodes=32,netfolder="networks/"):
 
 tasks = ['fdgo', 'reactgo', 'delaygo', 'fdanti', 'reactanti', 'delayanti',
             'delaydm1', 'delaydm2', 'contextdelaydm1', 'contextdelaydm2', 'multidelaydm',
-            'dmsgo', 'dmsnogo', 'dmcgo', 'dmcnogo']
-excluded = ['dm1', 'dm2', 'contextdm1', 'contextdm2','multidm']
+            'dmsgo', 'dmsnogo', 'dmcgo', 'dmcnogo','dm1', 'dm2', 'contextdm1', 'contextdm2','multidm']
+excluded = []
 
 # pair task iteration
 counter = 0 
@@ -52,4 +57,8 @@ for i in range(len(tasks)):
         print(counter)
         print(tasks[i],tasks[j])
         counter+=1
+        #if task folder exists ommit the run
+        if os.path.exists("../networks_24/laconeu_"+tasks[i]+"_"+tasks[j]+"_24"):
+            print("exists")
+            continue
         trainpair(tasks[i],tasks[j],hnodes=24,netfolder="../networks_24/")

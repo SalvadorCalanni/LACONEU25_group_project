@@ -12,3 +12,5 @@ sbatch/*
 checkpoint
 *.ckpt*
 *.json
+*.out
+*.zip

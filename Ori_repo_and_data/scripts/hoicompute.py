@@ -77,6 +77,18 @@ def compute_hois(alldata, model_dirs, hoi_dirs, max_order = 6, mean = True, raw 
         concatenated_meanhoi = concatenated_meanhoi.reset_index()
         concatenated_meanhoi.to_csv('concatenated_meanhoi_trimmed.csv')
 
+def mean_hois(hoi_dirs, max_order):
+    #for existing individual hoi_files
+    all_meanhoi = []
+    for hoifile in os.listdir(hoi_dirs): # ex: laconeu_contextdelaydm1_dmcgo_24_dmcgo_8.csv.zip
+        hoidata = pd.read_csv(f'{hoi_dirs}{hoifile}', compression='zip')
+        meanhoi = hoidata.groupby(['order','task','model']).mean()[["o", "s", "tc", "dtc"]]
+        all_meanhoi.append(meanhoi)
+    # Concatenate all meanhoi dataframes
+    concatenated_meanhoi = pd.concat(all_meanhoi)
+    concatenated_meanhoi = concatenated_meanhoi.reset_index()
+    concatenated_meanhoi.to_csv(f'concatenated_meanhoi_trimmed_{max_order}.csv')
+
 
 if __name__ == '__main__':
     model_dirs = os.listdir("../networks_24/")
@@ -84,11 +96,12 @@ if __name__ == '__main__':
     data_dir = "../"
     data_filename = "eval_24.npy"
 
-    max_order = 6
+    max_order = 8
     
     if not os.path.exists(data_dir+data_filename[:-4]+'_cropped.npy'):
-        cut_to_shortest()
+        cut_to_shortest(data_dir, data_filename)
     else:
         alldata = np.load(data_dir+data_filename[:-4]+'_cropped.npy', allow_pickle=True).item()
     
-    compute_hois(alldata, model_dirs, hoi_dirs, max_order, False, True)
+    #compute_hois(alldata, model_dirs, hoi_dirs, max_order, False, True)
+    mean_hois(hoi_dirs, max_order)
