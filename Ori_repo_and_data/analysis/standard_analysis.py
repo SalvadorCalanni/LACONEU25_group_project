@@ -21,7 +21,7 @@ def easy_activity_plot(model_dir, rule):
 
     model = Model(model_dir)
     hp = model.hp
-    bs = hp['batch_size']
+    bs = hp['batch_size_test']
 
     with tf.Session() as sess:
         model.restore()
