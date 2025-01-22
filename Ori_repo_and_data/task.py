@@ -10,7 +10,7 @@ rules_dict = \
     {'all' : ['fdgo', 'reactgo', 'delaygo', 'fdanti', 'reactanti', 'delayanti',
               'dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm',
               'delaydm1', 'delaydm2', 'contextdelaydm1', 'contextdelaydm2', 'multidelaydm',
-              'dmsgo', 'dmsnogo', 'dmcgo', 'dmcnogo', 'random'],
+              'dmsgo', 'dmsnogo', 'dmcgo', 'dmcnogo', 'random', 'random_mod'],
 
     'mante' : ['contextdm1', 'contextdm2'],
 
@@ -230,6 +230,35 @@ def random(config, mode=None, **kwargs):
     trial.add_x_noise()
     trial.add_c_mask(None, None)
 
+    return trial
+
+
+def random_mod(config, mode=None, **kwargs):
+    '''Random noise in modules 1 and 2. 
+    Uses rule for task channel and fixation is on'''
+
+    
+    dt = config['dt']
+    tdim = int(10000/dt)
+    batch_size = 32
+    
+    # Initialize the trial
+    trial = Trial(config, tdim, batch_size)
+
+
+    # Add random noise to mod1 and mod2
+    mod1_noise = np.random.uniform(0, 1, (tdim, batch_size, config['n_eachring']))
+    mod2_noise = np.random.uniform(0, 1, (tdim, batch_size, config['n_eachring']))
+    
+    for i in range(batch_size):
+        trial.x[:, i, 1:1 + config['n_eachring']] += mod1_noise[:, i, :]
+        trial.x[:, i, 1 + config['n_eachring']:1 + 2 * config['n_eachring']] += mod2_noise[:, i, :]
+    
+    #trial.add('stim', stim_locs, ons=stim_ons, offs=stim_offs, mods=mod1_noise)
+    #trial.add_x_noise()
+    trial.add_c_mask(None, None)
+    trial.x[:, :, 0] = 0#zero out fix
+    
     return trial
 
 
@@ -1562,7 +1591,8 @@ rule_mapping = {'testinit': test_init,
                 'dmcnogo': dmcnogo,
                 'oic': oic,
                 'dmc': delaymatchcategory_original,
-                'random':random}
+                'random':random,
+                'random_mod' : random_mod}
 
 rule_name    = {'reactgo': 'RT Go',
                 'delaygo': 'Dly Go',
@@ -1586,7 +1616,8 @@ rule_name    = {'reactgo': 'RT Go',
                 'dmcnogo': 'DNMC',
                 'oic': '1IC',
                 'dmc': 'DMC',
-                'random': 'rand'}
+                'random': 'rand',
+                'random_mod': 'rand_mod'}
 
 
 def generate_trials(rule, hp, mode, noise_on=True, **kwargs):
@@ -1639,9 +1670,11 @@ def generate_trials(rule, hp, mode, noise_on=True, **kwargs):
             rule_strength = [1.] * len(rule)
 
     #turn off adding rule here
-    if not ('no_rule' in kwargs and kwargs['no_rule']):
-        for r, s in zip(rule, rule_strength):
-            trial.add_rule(r, on=rule_on, off=rule_off, strength=s)
+    if (not ('no_rule' in kwargs and kwargs['no_rule'])):
+            for r, s in zip(rule, rule_strength):
+                if (not (r in ['random', 'random_mod'])):
+                    print(r)
+                    trial.add_rule(r, on=rule_on, off=rule_off, strength=s)
 
     if noise_on:
         trial.add_x_noise()
