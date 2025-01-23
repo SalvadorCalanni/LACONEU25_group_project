@@ -14,3 +14,4 @@ checkpoint
 *.json
 *.out
 *.zip
+*.pkl

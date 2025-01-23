@@ -95,7 +95,43 @@ def mean_hois(hoi_dirs, max_order):
     concatenated_meanhoi = pd.concat(all_meanhoi)
     concatenated_meanhoi = concatenated_meanhoi.reset_index()
     concatenated_meanhoi.to_csv(f'concatenated_meanhoi_24_trimmed_{max_order}.csv')
+
+def neuron_hois(hoi_dirs):
+    for model in os.listdir(hoi_dirs):
+        if model.endswith('.csv'):
+            continue
+        #if file exists ommit 
+        if os.path.exists(f'{hoi_dirs}{model.split(".")[0]}_pernode.csv'):
+            print("file exists")
+            print(f'{hoi_dirs}{model.split(".")[0]}_pernode.csv')
+            continue
+        
+        hoidata = pd.read_csv(f'{hoi_dirs}{model}', compression='zip')
+        means_list = []
+        metrics = ["tc","dtc","o","s"]
+        for i in range(24):
+            var_col = f"var_{i}"
+            filtered = hoidata[hoidata[var_col] == True]
+            grouped_means = filtered.groupby("order")[metrics].mean().reset_index()
+            grouped_means["node"] = i
+            means_list.append(grouped_means)
+        pernodedf = pd.concat(means_list, ignore_index=True)
+        newname = f'{model.split(".")[0]}_pernode.csv'
+        pernodedf.to_csv(f'{hoi_dirs}{newname}', index=False)
+    print("done")
     
+
+def joinnodemeans(hoi_dir):
+    #load mean hoi files and concatenate the dataframes
+    all_meanhoi = []
+    for hoifile in os.listdir(hoi_dir):
+        #if it ends in csv load it
+        if hoifile.endswith('_pernode.csv'):
+            hoidata = pd.read_csv(f'{hoi_dir}{hoifile}')
+            all_meanhoi.append(hoidata)
+    concatenated_meanhoi = pd.concat(all_meanhoi)
+    #concatenated_meanhoi = concatenated_meanhoi.reset_index()
+    concatenated_meanhoi.to_csv('concatenated_meanhoi_all_node_24.csv', index=False)
     
 def joinmeans(hoi_dir):
     #load mean hoi files and concatenate the dataframes
@@ -105,6 +141,9 @@ def joinmeans(hoi_dir):
         if hoifile.endswith('.csv'):
             hoidata = pd.read_csv(f'{hoi_dir}{hoifile}')
             all_meanhoi.append(hoidata)
+    concatenated_meanhoi = pd.concat(all_meanhoi)
+    #concatenated_meanhoi = concatenated_meanhoi.reset_index()
+    concatenated_meanhoi.to_csv('concatenated_meanhoi_all_24.csv', index=False)
 
 
 if __name__ == '__main__':
@@ -115,10 +154,13 @@ if __name__ == '__main__':
 
     max_order = 8
     
-    if not os.path.exists(data_dir+data_filename[:-4]+'_cropped.npy'):
-        cut_to_shortest(data_dir, data_filename)
-    else:
-        alldata = np.load(data_dir+data_filename[:-4]+'_cropped.npy', allow_pickle=True).item()
+    #if not os.path.exists(data_dir+data_filename[:-4]+'_cropped.npy'):
+    #    cut_to_shortest(data_dir, data_filename)
+    #else:
+    #    alldata = np.load(data_dir+data_filename[:-4]+'_cropped.npy', allow_pickle=True).item()
     
-    compute_hois(alldata, model_dirs, hoi_dirs, max_order, True, True)
+    #compute_hois(alldata, model_dirs, hoi_dirs, max_order, True, True)
     #mean_hois(hoi_dirs, max_order)
+    #joinmeans(hoi_dirs)
+    #neuron_hois(hoi_dirs)
+    #joinnodemeans(hoi_dirs)
