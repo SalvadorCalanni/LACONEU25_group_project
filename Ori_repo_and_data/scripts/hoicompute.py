@@ -46,55 +46,72 @@ def cut_to_shortest(data_dir, data_filename):
 def compute_hois(alldata, model_dirs, hoi_dirs, max_order = 6, mean = True, raw = False):
     counter = 0
     all_meanhoi = []
+    #if meanhoi file exists, mean is false
+    if os.path.exists('concatenated_meanhoi_24_trimmed.csv'):
+        mean = False
     for model in model_dirs:
         for task in alldata[model].keys():
-            if "SLURM_ARRAY_TASK_ID" in os.environ and counter != int(os.environ["SLURM_ARRAY_TASK_ID"]) and mean!=True:
+            if "SLURM_ARRAY_TASK_ID" in os.environ and counter != int(os.environ["SLURM_ARRAY_TASK_ID"]):
                 counter+=1
                 continue
             print(model, task, alldata[model][task].shape)
-            htensor = torch.tensor(alldata[model][task].T, dtype=torch.float32, device=usedDevice)
-            hoidata = multi_order_measures(alldata[model][task].T, min_order=3, max_order=max_order)
-            
-            if raw:
-                hoidata['model'] = model
-                hoidata['task'] = task
-                #save the raw data in efficient way as csv zip
-                hoidata.to_csv(f'{hoi_dirs}{model}_{task}_{max_order}.csv.zip', index=False, compression='zip')
+            #if file exists loads it
+            if os.path.exists(f'{hoi_dirs}{model}_{task}_{max_order}.csv.zip'):
+                print(f'{hoi_dirs}{model}_{task}_{max_order}.csv.zip exists')
+                hoidata = pd.read_csv(f'{hoi_dirs}{model}_{task}_{max_order}.csv.zip', compression='zip')
+            else:
+                htensor = torch.tensor(alldata[model][task].T, dtype=torch.float32, device=usedDevice)
+                hoidata = multi_order_measures(alldata[model][task].T, min_order=3, max_order=max_order)
+                # Save the mean hoi
+                if mean:
+                    meanhoi = hoidata.groupby('order').mean()[["o", "s", "tc", "dtc"]]
+                    meanhoi['model'] = model
+                    meanhoi['task'] = task
+                    meanhoi.to_csv(f'{hoi_dirs}{model}_{task}_{max_order}_mean.csv')
+                if raw:
+                    hoidata['model'] = model
+                    hoidata['task'] = task
+                    hoidata.to_csv(f'{hoi_dirs}{model}_{task}_{max_order}.csv.zip', index=False, compression='zip')
                 
-            if mean:
-            # Compute the mean hoi
-                meanhoi = hoidata.groupby('order').mean()[["o", "s", "tc", "dtc"]]
-                meanhoi['model'] = model
-                meanhoi['task'] = task
-                # Save the hoidata
-                all_meanhoi.append(meanhoi)
             counter+=1
             
-    if mean:
+    #if mean:
         # Concatenate all meanhoi dataframes
-        concatenated_meanhoi = pd.concat(all_meanhoi)
+        #concatenated_meanhoi = pd.concat(all_meanhoi)
         #save the concat dataframe
-        concatenated_meanhoi = concatenated_meanhoi.reset_index()
-        concatenated_meanhoi.to_csv('concatenated_meanhoi_trimmed.csv')
+        #concatenated_meanhoi = concatenated_meanhoi.reset_index()
+        #concatenated_meanhoi.to_csv('concatenated_meanhoi_trimmed.csv')
 
 def mean_hois(hoi_dirs, max_order):
-    #for existing individual hoi_files
+    if os.path.exists(f'concatenated_meanhoi_24_trimmed_{max_order}.csv'):
+        return
     all_meanhoi = []
     for hoifile in os.listdir(hoi_dirs): # ex: laconeu_contextdelaydm1_dmcgo_24_dmcgo_8.csv.zip
+        print(hoifile)
         hoidata = pd.read_csv(f'{hoi_dirs}{hoifile}', compression='zip')
         meanhoi = hoidata.groupby(['order','task','model']).mean()[["o", "s", "tc", "dtc"]]
         all_meanhoi.append(meanhoi)
     # Concatenate all meanhoi dataframes
     concatenated_meanhoi = pd.concat(all_meanhoi)
     concatenated_meanhoi = concatenated_meanhoi.reset_index()
-    concatenated_meanhoi.to_csv(f'concatenated_meanhoi_trimmed_{max_order}.csv')
+    concatenated_meanhoi.to_csv(f'concatenated_meanhoi_24_trimmed_{max_order}.csv')
+    
+    
+def joinmeans(hoi_dir):
+    #load mean hoi files and concatenate the dataframes
+    all_meanhoi = []
+    for hoifile in os.listdir(hoi_dir):
+        #if it ends in csv load it
+        if hoifile.endswith('.csv'):
+            hoidata = pd.read_csv(f'{hoi_dir}{hoifile}')
+            all_meanhoi.append(hoidata)
 
 
 if __name__ == '__main__':
     model_dirs = os.listdir("../networks_24/")
     hoi_dirs = "../hois_24/"
     data_dir = "../"
-    data_filename = "eval_24.npy"
+    data_filename = "mods_24_all.npy"
 
     max_order = 8
     
@@ -103,5 +120,5 @@ if __name__ == '__main__':
     else:
         alldata = np.load(data_dir+data_filename[:-4]+'_cropped.npy', allow_pickle=True).item()
     
-    #compute_hois(alldata, model_dirs, hoi_dirs, max_order, False, True)
-    mean_hois(hoi_dirs, max_order)
+    compute_hois(alldata, model_dirs, hoi_dirs, max_order, True, True)
+    #mean_hois(hoi_dirs, max_order)
